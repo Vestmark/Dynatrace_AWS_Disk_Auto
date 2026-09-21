@@ -1,0 +1,5 @@
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/calculate_disk_size.zip
+**/parser.zip
