@@ -13,7 +13,7 @@ data "archive_file" "calculate_disk_size" {
 }
 
 resource "aws_lambda_function" "calculate" {
-  function_name    = "CalculateDiskSize-${var.environment}"
+  function_name    = "CalculateDiskSize"
   role             = var.calculate_lambda_role_arn
   handler          = "lambda_function.lambda_handler"
   runtime          = "python3.13"

@@ -7,7 +7,7 @@ locals {
 }
 
 resource "aws_apigatewayv2_api" "disk_autoexpand" {
-  name          = "DiskAutoExpand-${var.environment}"
+  name          = "DiskAutoExpand"
   protocol_type = "HTTP"
   tags          = local.common_tags
 }

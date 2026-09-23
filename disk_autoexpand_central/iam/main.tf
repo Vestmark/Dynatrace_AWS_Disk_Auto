@@ -8,7 +8,7 @@ locals {
 }
 
 resource "aws_iam_role" "parser_lambda" {
-  name = "${local.project_name}-parser-${var.environment}"
+  name = "${local.project_name}-parser-lambda"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -26,7 +26,7 @@ resource "aws_iam_role_policy_attachment" "parser_lambda_basic" {
 }
 
 resource "aws_iam_role" "calculate_lambda" {
-  name = "${local.project_name}-calculate-${var.environment}"
+  name = "${local.project_name}-disk-calculate-lambda"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -44,7 +44,7 @@ resource "aws_iam_role_policy_attachment" "calculate_lambda_basic" {
 }
 
 resource "aws_iam_role" "step_functions" {
-  name = "${local.project_name}-stepfunctions-${var.environment}"
+  name = "${local.project_name}-stepfunctions"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{

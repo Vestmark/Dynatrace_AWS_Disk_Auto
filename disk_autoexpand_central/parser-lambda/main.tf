@@ -26,7 +26,7 @@ resource "aws_iam_role_policy" "parser_start_state_machine" {
 }
 
 resource "aws_lambda_function" "parser" {
-  function_name    = "ParseDynatraceDiskAlertAndStartExpansion-${var.environment}"
+  function_name    = "ParseDynatraceDiskAlertAndStartExpansion"
   role             = var.parser_lambda_role_arn
   handler          = "lambda_function.lambda_handler"
   runtime          = "python3.13"

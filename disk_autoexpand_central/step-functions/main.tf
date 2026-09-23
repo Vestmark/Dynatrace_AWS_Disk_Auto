@@ -33,7 +33,7 @@ resource "aws_iam_role_policy" "step_functions_assume_spoke" {
 }
 
 resource "aws_sfn_state_machine" "disk_autoexpand" {
-  name     = "disk-autoexpand-${var.environment}"
+  name     = "disk-autoexpand"
   role_arn = var.step_functions_role_arn
   definition = templatefile("${path.module}/disk_auto_expand.asl.json", {
     calculate_lambda_arn = var.calculate_lambda_arn
