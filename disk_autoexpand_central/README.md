@@ -10,6 +10,6 @@ These are five independently deployed Terraform root modules. Each directory nee
 
 Set `environment` explicitly and identically in all five Terragrunt configurations. The AWS provider region and credentials must be supplied by the TestD deployment environment. Do not run these directories with local state for a real deployment. Pin each Terragrunt `terraform.source` to a reviewed Bitbucket tag or commit.
 
-The original `disk-autoexpand-central` remains intact for reference. Do not apply both the original root and these modules to the same AWS account/environment: they define the same resource names. If the original root has already been applied, migrate the existing resources into the five new state files before applying them.
+Do not apply a previous all-in-one deployment and these modules to the same AWS account/environment: they define the same resource names. If the previous root has already been applied, migrate the existing resources into the five new state files before applying them.
 
 This split preserves the current infrastructure configuration. It does not create the cross-account spoke role; target accounts must have that role and trust the Step Functions role ARN output by `iam`.
