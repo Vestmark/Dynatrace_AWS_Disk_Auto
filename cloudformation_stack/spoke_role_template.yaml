@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  Creates the DiskAutoExpandSpokeRole used by the centralized
+  disk auto expansion Step Functions workflow.
+
+Parameters:
+  CentralStepFunctionsRoleArn:
+    Type: String
+    Description: ARN of the Step Functions execution role in the central account.
+
+Resources:
+
+  DiskAutoExpandSpokeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: DiskAutoExpandSpokeRole
+
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Ref CentralStepFunctionsRoleArn
+            Action:
+              - sts:AssumeRole
+
+      Policies:
+        - PolicyName: DiskAutoExpandPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+
+              - Sid: EC2VolumeActions
+                Effect: Allow
+                Action:
+                  - ec2:DescribeVolumes
+                  - ec2:DescribeVolumesModifications
+                  - ec2:ModifyVolume
+                  - ec2:DescribeInstances
+                Resource: "*"
+
+              - Sid: SSMActions
+                Effect: Allow
+                Action:
+                  - ssm:SendCommand
+                  - ssm:GetCommandInvocation
+                  - ssm:ListCommandInvocations
+                Resource: "*"
+
+Outputs:
+
+  SpokeRoleArn:
+    Description: ARN of the Disk Auto Expand spoke role.
+    Value: !GetAtt DiskAutoExpandSpokeRole.Arn
