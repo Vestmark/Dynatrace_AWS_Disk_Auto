@@ -84,6 +84,29 @@ def start_state_machine(payload):
     return response
 
 
+def get_expansion_sizes(response):
+    """Read EBS request sizes from successful output, not verified OS sizes."""
+    if response.get("status") != "SUCCEEDED":
+        return {}
+    try:
+        output = json.loads(response.get("output") or "{}")
+        modification = output["ModifyVolumeResult"]["VolumeModification"]
+        original = modification["OriginalSize"]
+        target = modification["TargetSize"]
+        if type(original) is not int or type(target) is not int:
+            return {}
+        if original <= 0 or target < original:
+            return {}
+        return {
+            "originalSizeGiB": original,
+            "targetSizeGiB": target,
+            "addedSizeGiB": target - original,
+        }
+    except (ValueError, TypeError, KeyError):
+        # Older executions or unavailable output must not break status polling.
+        return {}
+
+
 def get_execution_status(body):
     execution_arn = body.get("executionArn")
     prefix = STATE_MACHINE_ARN.replace(":stateMachine:", ":execution:") + ":"
@@ -104,6 +127,7 @@ def get_execution_status(body):
             "terminal": status in {"SUCCEEDED", "FAILED", "TIMED_OUT", "ABORTED"},
             "error": response.get("error"),
             "cause": response.get("cause"),
+            **get_expansion_sizes(response),
         }),
     }
 

@@ -60,3 +60,15 @@ The Dynatrace workflow retains the existing start task, then:
    The execution ARN remains available in task results for troubleshooting. SUCCEEDED, FAILED, TIMED_OUT, and ABORTED are reported distinctly.
 5. Marks the final outcome task failed for any outcome other than SUCCEEDED,
    after the Slack task has been attempted.
+
+
+### EBS size change in Slack
+
+Successful status responses optionally include `originalSizeGiB`, `targetSizeGiB`,
+and `addedSizeGiB`, extracted from the completed execution output at
+`ModifyVolumeResult.VolumeModification`. Slack displays, for example,
+`EBS size: 200 ? 230 GiB (+30 GiB)`. These are EBS modification request sizes,
+not independently verified Windows partition sizes. Missing or malformed size
+information does not interrupt polling: success messages show size details as
+unavailable. Non-success outcomes omit the size line.
+
