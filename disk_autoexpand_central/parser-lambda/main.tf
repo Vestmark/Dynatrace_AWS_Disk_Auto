@@ -21,6 +21,10 @@ resource "aws_iam_role_policy" "parser_start_state_machine" {
       Effect   = "Allow"
       Action   = ["states:StartExecution"]
       Resource = var.state_machine_arn
+    }, {
+      Effect   = "Allow"
+      Action   = ["states:DescribeExecution"]
+      Resource = "${replace(var.state_machine_arn, ":stateMachine:", ":execution:")}:*"
     }]
   })
 }

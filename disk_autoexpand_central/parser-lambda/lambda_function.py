@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import time
 import boto3
 
@@ -83,6 +84,30 @@ def start_state_machine(payload):
     return response
 
 
+def get_execution_status(body):
+    execution_arn = body.get("executionArn")
+    prefix = STATE_MACHINE_ARN.replace(":stateMachine:", ":execution:") + ":"
+    if not isinstance(execution_arn, str) or not execution_arn.startswith(prefix):
+        raise ValueError("executionArn must belong to the configured state machine")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", execution_arn[len(prefix):]):
+        raise ValueError("Invalid execution name")
+
+    response = sfn.describe_execution(executionArn=execution_arn)
+    status = response["status"]
+    return {
+        "statusCode": 200,
+        "headers": {"content-type": "application/json"},
+        "body": json.dumps({
+            "success": True,
+            "executionArn": execution_arn,
+            "status": status,
+            "terminal": status in {"SUCCEEDED", "FAILED", "TIMED_OUT", "ABORTED"},
+            "error": response.get("error"),
+            "cause": response.get("cause"),
+        }),
+    }
+
+
 def lambda_handler(event, context):
     print("=== Raw API Gateway Event ===")
     print(json.dumps(event, default=str))
@@ -97,6 +122,12 @@ def lambda_handler(event, context):
             raise ValueError(
                 "Request body must be a JSON object."
             )
+
+        action = body.get("action", "start")
+        if action == "status":
+            return get_execution_status(body)
+        if action != "start":
+            raise ValueError("action must be start or status")
 
         step_function_payload = build_step_function_payload(body)
 
