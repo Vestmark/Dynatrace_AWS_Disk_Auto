@@ -1,0 +1,241 @@
+{
+    "Comment": "Cross-account dynamic disk expansion workflow with Windows drive-to-EBS resolution via SSM",
+    "StartAt": "BuildTargetRoleArn",
+    "States": {
+        "BuildTargetRoleArn": {
+            "Type": "Pass",
+            "Parameters": {
+                "AccountId.$": "$.AccountId",
+                "Region.$": "$.Region",
+                "InstanceId.$": "$.InstanceId",
+                "DriveLetter.$": "$.DriveLetter",
+                "ExpandPercent.$": "$.ExpandPercent",
+                "TargetRoleArn.$": "States.Format('arn:aws:iam::{}:role/${spoke_role_name}', $.AccountId)"
+            },
+            "Next": "ResolveVolumeIdViaSSM"
+        },
+        "ResolveVolumeIdViaSSM": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::aws-sdk:ssm:sendCommand",
+            "Credentials": {
+                "RoleArn.$": "$.TargetRoleArn"
+            },
+            "Parameters": {
+                "DocumentName": "AWS-RunPowerShellScript",
+                "InstanceIds.$": "States.Array($.InstanceId)",
+                "Parameters": {
+                    "commands.$": "States.Array(States.Format('$Drive = \"{}\"; $Drive = $Drive.TrimEnd(\":\"); $Partition = Get-Partition -DriveLetter $Drive; $Disk = Get-Disk -Number $Partition.DiskNumber; $Serial = $Disk.SerialNumber.Trim(); $VolumeId = $Serial -replace \"^vol\", \"vol-\" -replace \"_.*$\", \"\"; [Console]::Write($VolumeId)', $.DriveLetter))"
+                }
+            },
+            "ResultPath": "$.VolumeLookupCommand",
+            "Next": "WaitForVolumeLookup"
+        },
+        "WaitForVolumeLookup": {
+            "Type": "Wait",
+            "Seconds": 10,
+            "Next": "GetVolumeLookupResult"
+        },
+        "GetVolumeLookupResult": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::aws-sdk:ssm:getCommandInvocation",
+            "Credentials": {
+                "RoleArn.$": "$.TargetRoleArn"
+            },
+            "Parameters": {
+                "CommandId.$": "$.VolumeLookupCommand.Command.CommandId",
+                "InstanceId.$": "$.InstanceId"
+            },
+            "ResultPath": "$.VolumeLookupResult",
+            "Next": "CheckVolumeLookup"
+        },
+        "CheckVolumeLookup": {
+            "Type": "Choice",
+            "Choices": [
+                {
+                    "Variable": "$.VolumeLookupResult.Status",
+                    "StringEquals": "Success",
+                    "Next": "DescribeResolvedVolume"
+                },
+                {
+                    "Variable": "$.VolumeLookupResult.Status",
+                    "StringEquals": "InProgress",
+                    "Next": "WaitForVolumeLookup"
+                },
+                {
+                    "Variable": "$.VolumeLookupResult.Status",
+                    "StringEquals": "Pending",
+                    "Next": "WaitForVolumeLookup"
+                },
+                {
+                    "Variable": "$.VolumeLookupResult.Status",
+                    "StringEquals": "Delayed",
+                    "Next": "WaitForVolumeLookup"
+                }
+            ],
+            "Default": "FailVolumeLookup"
+        },
+        "DescribeResolvedVolume": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::aws-sdk:ec2:describeVolumes",
+            "Credentials": {
+                "RoleArn.$": "$.TargetRoleArn"
+            },
+            "Parameters": {
+                "VolumeIds.$": "States.Array($.VolumeLookupResult.StandardOutputContent)"
+            },
+            "ResultPath": "$.ResolvedVolume",
+            "Next": "ValidateVolumeAttachment"
+        },
+        "ValidateVolumeAttachment": {
+            "Type": "Choice",
+            "Choices": [
+                {
+                    "And": [
+                        {
+                            "Variable": "$.ResolvedVolume.Volumes[0].VolumeId",
+                            "IsPresent": true
+                        },
+                        {
+                            "Variable": "$.ResolvedVolume.Volumes[0].Attachments[0].InstanceId",
+                            "IsPresent": true
+                        },
+                        {
+                            "Variable": "$.ResolvedVolume.Volumes[0].Attachments[0].InstanceId",
+                            "StringEqualsPath": "$.InstanceId"
+                        }
+                    ],
+                    "Next": "CalculateNewSize"
+                }
+            ],
+            "Default": "FailVolumeValidation"
+        },
+        "CalculateNewSize": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+                "FunctionName": "${calculate_lambda_arn}",
+                "Payload": {
+                    "AccountId.$": "$.AccountId",
+                    "Region.$": "$.Region",
+                    "InstanceId.$": "$.InstanceId",
+                    "DriveLetter.$": "$.DriveLetter",
+                    "TargetRoleArn.$": "$.TargetRoleArn",
+                    "VolumeId.$": "$.ResolvedVolume.Volumes[0].VolumeId",
+                    "CurrentSizeGiB.$": "$.ResolvedVolume.Volumes[0].Size",
+                    "ExpandPercent.$": "$.ExpandPercent"
+                }
+            },
+            "ResultPath": "$.SizeCalculation",
+            "Next": "ExtractVolumeInfo"
+        },
+        "ExtractVolumeInfo": {
+            "Type": "Pass",
+            "Parameters": {
+                "AccountId.$": "$.AccountId",
+                "Region.$": "$.Region",
+                "InstanceId.$": "$.InstanceId",
+                "DriveLetter.$": "$.DriveLetter",
+                "TargetRoleArn.$": "$.TargetRoleArn",
+                "VolumeId.$": "$.ResolvedVolume.Volumes[0].VolumeId",
+                "NewSizeGiB.$": "$.SizeCalculation.Payload.NewSizeGiB"
+            },
+            "Next": "ModifyVolume"
+        },
+        "ModifyVolume": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::aws-sdk:ec2:modifyVolume",
+            "Credentials": {
+                "RoleArn.$": "$.TargetRoleArn"
+            },
+            "Parameters": {
+                "VolumeId.$": "$.VolumeId",
+                "Size.$": "$.NewSizeGiB"
+            },
+            "ResultPath": "$.ModifyVolumeResult",
+            "Next": "WaitForEBS"
+        },
+        "WaitForEBS": {
+            "Type": "Wait",
+            "Seconds": 60,
+            "Next": "ResizeWindowsDisk"
+        },
+        "ResizeWindowsDisk": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::aws-sdk:ssm:sendCommand",
+            "Credentials": {
+                "RoleArn.$": "$.TargetRoleArn"
+            },
+            "Parameters": {
+                "DocumentName": "AWS-RunPowerShellScript",
+                "InstanceIds.$": "States.Array($.InstanceId)",
+                "Parameters": {
+                    "commands.$": "States.Array(States.Format('$Drive = \"{}\"; $Drive = $Drive.TrimEnd(\":\"); Update-HostStorageCache; $MaxSize = (Get-PartitionSupportedSize -DriveLetter $Drive).SizeMax; Resize-Partition -DriveLetter $Drive -Size $MaxSize; Get-Volume -DriveLetter $Drive | Select DriveLetter, Size, SizeRemaining', $.DriveLetter))"
+                }
+            },
+            "ResultPath": "$.SSMCommandResult",
+            "Next": "WaitForSSMCommand"
+        },
+        "WaitForSSMCommand": {
+            "Type": "Wait",
+            "Seconds": 20,
+            "Next": "CheckSSMCommand"
+        },
+        "CheckSSMCommand": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::aws-sdk:ssm:getCommandInvocation",
+            "Credentials": {
+                "RoleArn.$": "$.TargetRoleArn"
+            },
+            "Parameters": {
+                "CommandId.$": "$.SSMCommandResult.Command.CommandId",
+                "InstanceId.$": "$.InstanceId"
+            },
+            "ResultPath": "$.SSMCommandStatus",
+            "Next": "SSMCommandSucceeded"
+        },
+        "SSMCommandSucceeded": {
+            "Type": "Choice",
+            "Choices": [
+                {
+                    "Variable": "$.SSMCommandStatus.Status",
+                    "StringEquals": "Success",
+                    "Next": "Success"
+                },
+                {
+                    "Variable": "$.SSMCommandStatus.Status",
+                    "StringEquals": "InProgress",
+                    "Next": "WaitForSSMCommand"
+                },
+                {
+                    "Variable": "$.SSMCommandStatus.Status",
+                    "StringEquals": "Pending",
+                    "Next": "WaitForSSMCommand"
+                },
+                {
+                    "Variable": "$.SSMCommandStatus.Status",
+                    "StringEquals": "Delayed",
+                    "Next": "WaitForSSMCommand"
+                }
+            ],
+            "Default": "FailSSMCommand"
+        },
+        "Success": {
+            "Type": "Succeed"
+        },
+        "FailVolumeLookup": {
+            "Type": "Fail",
+            "Error": "VolumeLookupFailed",
+            "Cause": "Unable to resolve the AWS EBS Volume ID from the Windows drive through SSM."
+        },
+        "FailVolumeValidation": {
+            "Type": "Fail",
+            "Error": "VolumeValidationFailed",
+            "Cause": "The resolved EBS volume was not found or is not attached to the expected EC2 instance."
+        },
+        "FailSSMCommand": {
+            "Type": "Fail",
+            "Error": "SSMCommandFailed",
+            "Cause": "SSM resize command did not complete successfully."
+        }
+    }
+}

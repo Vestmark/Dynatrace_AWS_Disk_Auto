@@ -1,0 +1,179 @@
+RUNDECK:DATA:client=testd
+RUNDECK:DATA:stack_name=testd
+RUNDECK:DATA:environment=dev
+Running Terragrunt Configurable
+Client: TestD
+Environment: dev
+/tmp/tmp.qGCQbOg15F
+getting terraform 1.4.7
+getting terragrunt 0.58.15
+Version: 0.13.1308
+Switched terragrunt to version "0.58.15" 
+Switched terraform to version "1.4.7" 
+terragrunt version v0.58.15
+Terraform v1.4.7
+on linux_amd64
+Your version of Terraform is out of date! The latest version
+is 1.16.3. You can update by downloading from https://www.terraform.io/downloads.html
+Retrieving Secret from: testd/dev/aws-keys
+Cloning into 'terragrunt_repo'...
+export TF_VAR_stack_name=testd
+export TF_VAR_environment=dev
+time=2026-09-23T11:34:06Z level=warning msg='plan-all' is deprecated. Running 'terragrunt run-all plan' instead. Please update your workflows to use 'terragrunt run-all plan', as 'plan-all' may be removed in the future!
+time=2026-09-23T11:34:06Z level=info msg=The stack at /tmp/tmp.qGCQbOg15F/terragrunt_repo/main/us-east-1/disk_autoexpand_central/iam will be processed in the following order for command plan:
+Group 1
+- Module /tmp/tmp.qGCQbOg15F/terragrunt_repo/main/us-east-1/disk_autoexpand_central/iam
+Running: plan-all in Terragrunt working dir: /tmp/tmp.qGCQbOg15F/terragrunt_repo/main/us-east-1/disk_autoexpand_central/iam
+time=2026-09-23T11:34:06Z level=info msg=Downloading Terraform configurations from git::https://github.com/Vestmark/Dynatrace_AWS_Disk_Auto.git?ref=ef8e21e6a6d42bcaf5c259282e302407d9ed1259 into /tmp/tmp.qGCQbOg15F/terragrunt_repo/main/us-east-1/disk_autoexpand_central/iam/.terragrunt-cache/C_M4vR3JVZJFlg0Xil88dPf0DkE/NDH3DnayHrX6HqUwT_lHJuJOfiA prefix=[/tmp/tmp.qGCQbOg15F/terragrunt_repo/main/us-east-1/disk_autoexpand_central/iam] 
+Initializing the backend...
+Successfully configured the backend "s3"! Terraform will automatically
+use this backend unless the backend configuration changes.
+Initializing provider plugins...
+- Reusing previous version of hashicorp/aws from the dependency lock file
+- Installing hashicorp/aws v6.63.0...
+- Installed hashicorp/aws v6.63.0 (signed by HashiCorp)
+Terraform has made some changes to the provider dependency selections recorded
+in the .terraform.lock.hcl file. Review those changes and commit them to your
+version control system if they represent changes you intended to make.
+Terraform has been successfully initialized!
+time=2026-09-23T11:34:31Z level=info msg=time=2026-09-23T11:34:06Z level=warning msg=The remote state S3 bucket terragrunt-tf-state-vestmark-testd-dev-us-east-1 needs to be updated: prefix=[/tmp/tmp.qGCQbOg15F/terragrunt_repo/main/us-east-1/disk_autoexpand_central/iam] 
+time=2026-09-23T11:34:06Z level=warning msg=  - Bucket Access Logging prefix=[/tmp/tmp.qGCQbOg15F/terragrunt_repo/main/us-east-1/disk_autoexpand_central/iam] 
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  + create
+Terraform will perform the following actions:
+  # aws_iam_role.calculate_lambda will be created
+  + resource "aws_iam_role" "calculate_lambda" {
+      + arn                   = (known after apply)
+      + assume_role_policy    = jsonencode(
+            {
+              + Statement = [
+                  + {
+                      + Action    = "sts:AssumeRole"
+                      + Effect    = "Allow"
+                      + Principal = {
+                          + Service = "lambda.amazonaws.com"
+                        }
+                    },
+                ]
+              + Version   = "2012-10-17"
+            }
+        )
+      + create_date           = (known after apply)
+      + force_detach_policies = false
+      + id                    = (known after apply)
+      + managed_policy_arns   = (known after apply)
+      + max_session_duration  = 3600
+      + name                  = "disk-autoexpand-calculate-dev"
+      + name_prefix           = (known after apply)
+      + path                  = "/"
+      + tags                  = {
+          + "Environment" = "dev"
+          + "ManagedBy"   = "Terraform"
+          + "Project"     = "DiskAutoExpansion"
+        }
+      + tags_all              = {
+          + "Environment" = "dev"
+          + "ManagedBy"   = "Terraform"
+          + "Project"     = "DiskAutoExpansion"
+        }
+      + unique_id             = (known after apply)
+    }
+  # aws_iam_role.parser_lambda will be created
+  + resource "aws_iam_role" "parser_lambda" {
+      + arn                   = (known after apply)
+      + assume_role_policy    = jsonencode(
+            {
+              + Statement = [
+                  + {
+                      + Action    = "sts:AssumeRole"
+                      + Effect    = "Allow"
+                      + Principal = {
+                          + Service = "lambda.amazonaws.com"
+                        }
+                    },
+                ]
+              + Version   = "2012-10-17"
+            }
+        )
+      + create_date           = (known after apply)
+      + force_detach_policies = false
+      + id                    = (known after apply)
+      + managed_policy_arns   = (known after apply)
+      + max_session_duration  = 3600
+      + name                  = "disk-autoexpand-parser-dev"
+      + name_prefix           = (known after apply)
+      + path                  = "/"
+      + tags                  = {
+          + "Environment" = "dev"
+          + "ManagedBy"   = "Terraform"
+          + "Project"     = "DiskAutoExpansion"
+        }
+      + tags_all              = {
+          + "Environment" = "dev"
+          + "ManagedBy"   = "Terraform"
+          + "Project"     = "DiskAutoExpansion"
+        }
+      + unique_id             = (known after apply)
+    }
+  # aws_iam_role.step_functions will be created
+  + resource "aws_iam_role" "step_functions" {
+      + arn                   = (known after apply)
+      + assume_role_policy    = jsonencode(
+            {
+              + Statement = [
+                  + {
+                      + Action    = "sts:AssumeRole"
+                      + Effect    = "Allow"
+                      + Principal = {
+                          + Service = "states.amazonaws.com"
+                        }
+                    },
+                ]
+              + Version   = "2012-10-17"
+            }
+        )
+      + create_date           = (known after apply)
+      + force_detach_policies = false
+      + id                    = (known after apply)
+      + managed_policy_arns   = (known after apply)
+      + max_session_duration  = 3600
+      + name                  = "disk-autoexpand-stepfunctions-dev"
+      + name_prefix           = (known after apply)
+      + path                  = "/"
+      + tags                  = {
+          + "Environment" = "dev"
+          + "ManagedBy"   = "Terraform"
+          + "Project"     = "DiskAutoExpansion"
+        }
+      + tags_all              = {
+          + "Environment" = "dev"
+          + "ManagedBy"   = "Terraform"
+          + "Project"     = "DiskAutoExpansion"
+        }
+      + unique_id             = (known after apply)
+    }
+  # aws_iam_role_policy_attachment.calculate_lambda_basic will be created
+  + resource "aws_iam_role_policy_attachment" "calculate_lambda_basic" {
+      + id         = (known after apply)
+      + policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      + role       = "disk-autoexpand-calculate-dev"
+    }
+  # aws_iam_role_policy_attachment.parser_lambda_basic will be created
+  + resource "aws_iam_role_policy_attachment" "parser_lambda_basic" {
+      + id         = (known after apply)
+      + policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      + role       = "disk-autoexpand-parser-dev"
+    }
+Plan: 5 to add, 0 to change, 0 to destroy.
+Changes to Outputs:
+  + calculate_lambda_role_arn = (known after apply)
+  + parser_lambda_role_arn    = (known after apply)
+  + parser_lambda_role_name   = "disk-autoexpand-parser-dev"
+  + step_functions_role_arn   = (known after apply)
+  + step_functions_role_name  = "disk-autoexpand-stepfunctions-dev"
+Checking lifecycle policy for bucket: terragrunt-tf-state-vestmark-testd-dev-us-east-1
+Lifecycle policy already exists for bucket: terragrunt-tf-state-vestmark-testd-dev-us-east-1. No action taken.
+Processing bucket: terragrunt-access-logs-vestmark-testd-dev-us-east-1
+Versioning suspended for bucket: terragrunt-access-logs-vestmark-testd-dev-us-east-1
+Deleted temp working directory /tmp/tmp.qGCQbOg15F

@@ -1,0 +1,214 @@
+{
+  "id": "27d69181-70b7-4ad8-8314-ba457280b97a",
+  "title": "AutoExpansion-Test",
+  "description": "",
+  "actor": "0ad84536-3ec9-461d-9b26-1ca0b13a5db4",
+  "owner": "0ad84536-3ec9-461d-9b26-1ca0b13a5db4",
+  "ownerType": "USER",
+  "isPrivate": true,
+  "schemaVersion": 4,
+  "trigger": {
+    "eventTrigger": {
+      "isActive": true,
+      "triggerConfiguration": {
+        "type": "davis-event",
+        "value": {
+          "names": [
+            {
+              "name": "[AutoExpand-Test]",
+              "match": "contains"
+            }
+          ],
+          "entityTags": {},
+          "customFilter": "",
+          "onProblemClose": false,
+          "entityTagsMatch": "all",
+          "maintenanceWindowTriggerBehavior": "always",
+          "triggerOn": null
+        }
+      }
+    }
+  },
+  "result": null,
+  "type": "STANDARD",
+  "input": {},
+  "hourlyExecutionLimit": 1000,
+  "guide": null,
+  "tasks": {
+    "run_javascript_1": {
+      "name": "run_javascript_1",
+      "input": {
+        "script": "import { execution } from '@dynatrace-sdk/automation-utils';\nimport { monitoredEntitiesClient } from '@dynatrace-sdk/client-classic-environment-v2';\n\nexport default async function () {\n  const ex = await execution();\n  const event = ex.params?.event;\n\n  if (!event) {\n    throw new Error(\n      \"No Davis event payload received. This workflow must be started by the Davis event trigger.\"\n    );\n  }\n\n  const hostEntityId = event[\"dt.entity.host\"];\n\n  if (!hostEntityId) {\n    throw new Error(\n      \"dt.entity.host was not found in the Davis event payload\"\n    );\n  }\n\n  const rawDrive = event[\"autoexpand.drive\"];\n  const drive = rawDrive?.replace(/\\\\+$/, \"\");\n\n  const hostEntity = await monitoredEntitiesClient.getEntity({\n    entityId: hostEntityId,\n    fields: \"+properties,+fromRelationships\"\n  });\n\n  const ec2Relationship =\n    hostEntity.fromRelationships?.runsOn?.find(\n      entity => entity.type === \"EC2_INSTANCE\"\n    );\n\n  if (!ec2Relationship) {\n    throw new Error(\n      `No EC2_INSTANCE relationship found for host ${hostEntityId}`\n    );\n  }\n\n  const ec2Entity = await monitoredEntitiesClient.getEntity({\n    entityId: ec2Relationship.id,\n    fields: \"+properties\"\n  });\n\n  const arn = ec2Entity.properties?.arn;\n  const instanceId = ec2Entity.properties?.awsInstanceId;\n  const region =\n    ec2Entity.properties?.regionName ||\n    event[\"aws.region\"];\n\n  if (!arn) {\n    throw new Error(\n      \"AWS ARN was not found on the EC2 entity\"\n    );\n  }\n\n  if (!instanceId) {\n    throw new Error(\n      \"AWS Instance ID was not found on the EC2 entity\"\n    );\n  }\n\n  const accountId = arn.split(\":\")[4];\n\n  return {\n    arn,\n    accountId,\n    instanceId,\n    region,\n    host: event[\"autoexpand.host\"],\n    drive,\n    eventId: event[\"event.id\"]\n  };\n}",
+        "sdkMajorVersions": {
+          "@dynatrace-sdk/units": "1",
+          "@dynatrace-sdk/client-hub": "2",
+          "@dynatrace-sdk/client-iam": "1",
+          "@dynatrace-sdk/adhoc-utils": "1",
+          "@dynatrace-sdk/http-client": "1",
+          "@dynatrace-sdk/client-query": "1",
+          "@dynatrace-sdk/shared-errors": "1",
+          "@dynatrace-sdk/error-handlers": "1",
+          "@dynatrace-sdk/app-environment": "1",
+          "@dynatrace-sdk/client-document": "1",
+          "@dynatrace-sdk/automation-utils": "2",
+          "@dynatrace-sdk/client-synthetic": "2",
+          "@dynatrace-sdk/user-preferences": "1",
+          "@dynatrace-sdk/client-automation": "8",
+          "@dynatrace-sdk/client-hub-catalog": "0",
+          "@dynatrace-sdk/shared-client-utils": "1",
+          "@dynatrace-sdk/client-resource-store": "1",
+          "@dynatrace-sdk/client-davis-analyzers": "1",
+          "@dynatrace-sdk/client-bucket-management": "3",
+          "@dynatrace-sdk/client-app-engine-registry": "3",
+          "@dynatrace-sdk/client-classic-environment-v1": "2",
+          "@dynatrace-sdk/client-classic-environment-v2": "7",
+          "@dynatrace-sdk/client-app-engine-edge-connect": "1",
+          "@dynatrace-sdk/client-service-level-objectives": "1",
+          "@dynatrace-sdk/client-filter-segment-management": "1",
+          "@dynatrace-sdk/client-platform-management-service": "1"
+        }
+      },
+      "action": "dynatrace.automations:run-javascript",
+      "position": {
+        "x": 0,
+        "y": 1
+      },
+      "description": "Run custom JavaScript code.",
+      "predecessors": []
+    },
+    "to_api_gateway_1": {
+      "name": "to_api_gateway_1",
+      "input": {
+        "url": "https://5nlyoe4s9c.execute-api.us-east-1.amazonaws.com/disk-autoexpand",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "payload": "{\n  \"accountId\": \"{{ result('run_javascript_1').accountId }}\",\n  \"instanceId\": \"{{ result('run_javascript_1').instanceId }}\",\n  \"region\": \"{{ result('run_javascript_1').region }}\",\n  \"host\": \"{{ result('run_javascript_1').host }}\",\n  \"drive\": \"{{ result('run_javascript_1').drive }}\",\n  \"eventId\": \"{{ result('run_javascript_1').eventId }}\"\n}",
+        "failOnResponseCodes": "400-599"
+      },
+      "action": "dynatrace.automations:http-function",
+      "active": true,
+      "position": {
+        "x": 0,
+        "y": 2
+      },
+      "conditions": {
+        "states": {
+          "run_javascript_1": "OK"
+        }
+      },
+      "description": "Issue an HTTP request to any API.",
+      "predecessors": [
+        "run_javascript_1"
+      ]
+    },
+    "poll_expansion": {
+      "name": "poll_expansion",
+      "action": "dynatrace.automations:run-javascript",
+      "input": {
+        "script": "import { execution } from '@dynatrace-sdk/automation-utils';\nconst ENDPOINT = \"https://5nlyoe4s9c.execute-api.us-east-1.amazonaws.com/disk-autoexpand\";\nconst TERMINAL = ['SUCCEEDED', 'FAILED', 'TIMED_OUT', 'ABORTED'];\nasync function startResult(ex) {\n  const response = await ex.result('to_api_gateway_1');\n  const body = response?.json ?? response?.body;\n  const data = typeof body === 'string' ? JSON.parse(body) : body;\n  if (!data?.success || !data?.executionArn) throw new Error('No confirmed execution ARN returned by start request');\n  return data;\n}\nasync function readStatus(executionArn) {\n  const response = await fetch(ENDPOINT, {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({ action: 'status', executionArn }),\n    signal: AbortSignal.timeout(15000)\n  });\n  if (!response.ok) throw new Error(`Status API returned HTTP ${response.status}`);\n  const data = await response.json();\n  if (!data.success || data.executionArn !== executionArn ||\n      ![...TERMINAL, 'RUNNING', 'PENDING_REDRIVE'].includes(data.status)) {\n    throw new Error('Invalid status response');\n  }\n  return data;\n}\n\nexport default async function () {\n  const ex = await execution();\n  const started = await startResult(ex);\n  const status = await readStatus(started.executionArn);\n  if (!TERMINAL.includes(status.status)) throw new Error(`Expansion still pending: ${status.status}`);\n  return status;\n}\n",
+        "sdkMajorVersions": {
+          "@dynatrace-sdk/automation-utils": "2"
+        }
+      },
+      "predecessors": [
+        "to_api_gateway_1"
+      ],
+      "conditions": {
+        "states": {
+          "to_api_gateway_1": "OK"
+        }
+      },
+      "position": {
+        "x": 0,
+        "y": 3
+      },
+      "waitBefore": 30,
+      "retry": {
+        "count": 59,
+        "delay": 30
+      },
+      "timeout": 2100,
+      "description": "Check once per attempt; retry pending/transient errors, up to 60 attempts and a 35-minute task timeout. Never retry the start request."
+    },
+    "prepare_result": {
+      "name": "prepare_result",
+      "action": "dynatrace.automations:run-javascript",
+      "input": {
+        "script": "import { execution } from '@dynatrace-sdk/automation-utils';\nconst ENDPOINT = \"https://5nlyoe4s9c.execute-api.us-east-1.amazonaws.com/disk-autoexpand\";\nconst TERMINAL = ['SUCCEEDED', 'FAILED', 'TIMED_OUT', 'ABORTED'];\nasync function startResult(ex) {\n  const response = await ex.result('to_api_gateway_1');\n  const body = response?.json ?? response?.body;\n  const data = typeof body === 'string' ? JSON.parse(body) : body;\n  if (!data?.success || !data?.executionArn) throw new Error('No confirmed execution ARN returned by start request');\n  return data;\n}\nasync function readStatus(executionArn) {\n  const response = await fetch(ENDPOINT, {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({ action: 'status', executionArn }),\n    signal: AbortSignal.timeout(15000)\n  });\n  if (!response.ok) throw new Error(`Status API returned HTTP ${response.status}`);\n  const data = await response.json();\n  if (!data.success || data.executionArn !== executionArn ||\n      ![...TERMINAL, 'RUNNING', 'PENDING_REDRIVE'].includes(data.status)) {\n    throw new Error('Invalid status response');\n  }\n  return data;\n}\n\nexport default async function () {\n  const ex = await execution();\n  let host = {};\n  try { host = await ex.result('run_javascript_1') ?? {}; } catch (_) {}\n  let started;\n  let status;\n  try {\n    started = await startResult(ex);\n  } catch (error) {\n    status = { status: 'START_UNCONFIRMED', cause: String(error) + '. Check AWS before retrying; the request may have been accepted.' };\n  }\n  if (started) {\n    try { status = await ex.result('poll_expansion'); } catch (_) {}\n    if (!status || !TERMINAL.includes(status.status)) {\n      try {\n        status = await readStatus(started.executionArn);\n        if (!TERMINAL.includes(status.status)) {\n          status = { ...status, status: 'MONITORING_TIMEOUT', cause: 'Polling ended while AWS is still pending. Expansion outcome is unknown; AWS was not cancelled.' };\n        }\n      } catch (error) {\n        status = { status: 'MONITORING_ERROR', cause: `Unable to retrieve final AWS status: ${String(error)}. Expansion outcome is unknown.` };\n      }\n    }\n  }\n  const escape = value => String(value ?? 'unknown').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n  const success = status.status === 'SUCCEEDED';\n  const executionArn = started?.executionArn ?? 'unavailable';\n  const detail = success ? 'Expansion workflow completed; SSM resize command reported success. Partition growth has not been independently verified.' : [status.error, status.cause].filter(Boolean).join(': ');\n  const hasSizes = success && Number.isInteger(status.originalSizeGiB) &&\n    Number.isInteger(status.targetSizeGiB) && Number.isInteger(status.addedSizeGiB) &&\n    status.originalSizeGiB > 0 && status.targetSizeGiB >= status.originalSizeGiB &&\n    status.addedSizeGiB === status.targetSizeGiB - status.originalSizeGiB;\n  const sizeLines = success ? [hasSizes\n    ? `EBS size: ${status.originalSizeGiB} ? ${status.targetSizeGiB} GiB (+${status.addedSizeGiB} GiB)`\n    : 'EBS size change: unavailable in execution output.'] : [];\n  const message = [\n    `*Disk Auto Expansion: ${escape(status.status)}*`,\n    `Host: ${escape(host.host || host.instanceId)}`,\n    `Instance: ${escape(host.instanceId)} | Drive: ${escape(host.drive)}`,\n    `Account: ${escape(host.accountId)} | Region: ${escape(host.region)}`,\n    ...sizeLines,\n    escape(detail.slice(0, 2000))\n  ].join('\\n');\n  return { status: status.status, success, executionArn, message };\n}\n",
+        "sdkMajorVersions": {
+          "@dynatrace-sdk/automation-utils": "2"
+        }
+      },
+      "predecessors": [
+        "run_javascript_1",
+        "to_api_gateway_1",
+        "poll_expansion"
+      ],
+      "conditions": {
+        "states": {
+          "run_javascript_1": "ANY",
+          "to_api_gateway_1": "ANY",
+          "poll_expansion": "ANY"
+        }
+      },
+      "position": {
+        "x": 0,
+        "y": 4
+      }
+    },
+    "notify_slack": {
+      "name": "notify_slack",
+      "action": "dynatrace.slack:slack-send-message",
+      "input": {
+        "channel": "C0AHD4JD65R",
+        "message": "{{ result(\"prepare_result\").message }}",
+        "reaction": [],
+        "connection": "vu9U3hXa3q0AAAABAB5hcHA6ZHluYXRyYWNlLnNsYWNrOmNvbm5lY3Rpb24ABnRlbmFudAAGdGVuYW50ACQwMmM3NjU4Zi04N2M2LTMyNmQtOWNiMS04NWQwNTU4YTlmZTW-71TeFdrerQ",
+        "channelType": "id",
+        "executionDate": "{{ execution().started_at }}",
+        "messageFormat": "slack_format",
+        "appendToThread": false,
+        "replyBroadcast": false,
+        "selectedRequestType": 0,
+        "attachmentToggleValue": "none"
+      },
+      "predecessors": [
+        "prepare_result"
+      ],
+      "conditions": {
+        "states": {
+          "prepare_result": "OK"
+        }
+      },
+      "position": {
+        "x": 0,
+        "y": 5
+      },
+      "description": "Report AWS success/failure or unknown monitoring outcome to Slack."
+    },
+    "check_outcome": {
+      "name": "check_outcome",
+      "action": "dynatrace.automations:run-javascript",
+      "input": {
+        "script": "import { execution } from '@dynatrace-sdk/automation-utils';\nexport default async function () {\n  const ex = await execution();\n  const result = await ex.result('prepare_result');\n  if (!result.success) throw new Error(`Disk expansion result: ${result.status}; execution: ${result.executionArn}`);\n  return result;\n}\n",
+        "sdkMajorVersions": {
+          "@dynatrace-sdk/automation-utils": "2"
+        }
+      },
+      "predecessors": [
+        "notify_slack"
+      ],
+      "conditions": {
+        "states": {
+          "notify_slack": "ANY"
+        }
+      },
+      "position": {
+        "x": 0,
+        "y": 6
+      }
+    }
+  }
+}
